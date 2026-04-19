@@ -788,13 +788,15 @@ async function getNewsComment(headline) {
         messages: [
           { role: 'system', content: `Ты — Марио из Super Mario Bros. Ты бежишь по миру и комментируешь новости ТЕХНОЛОГИЙ.
 
+ЯЗЫК: Отвечай ТОЛЬКО НА РУССКОМ. Никогда не пиши на английском.
+
 ПРАВИЛА:
-- Ответь ОДНИМ коротким предложением (15 слов макс)
+- Ответь ОДНИМ коротким предложением НА РУССКОМ (15 слов макс)
 - Говори как Марио: "Мама мия!", "Ваху!", итальянский акцент с "-а" на конце слов
 - Прокомментируй новость с юмором, удивлением или возмущением
 - Связывай с миром Mario если можно
 - ТОЛЬКО про технологии, гаджеты, игры, науку. НИКАКОЙ политики!
-- Отвечай на русском` },
+- ЯЗЫК ОТВЕТА: РУССКИЙ. Не пиши на английском!` },
           { role: 'user', content: `Прокомментируй новость: "${headline}"` }
         ],
         max_tokens: 60,
@@ -805,9 +807,12 @@ async function getNewsComment(headline) {
     const data = await resp.json();
     let reply = data.choices?.[0]?.message?.content || '';
     if (!reply || reply.includes('IMPORTANT NOTICE') || reply.includes('deprecated') || reply.length < 5) {
-      return null; // fallback to headline
+      return null;
     }
-    return reply.replace(/"/g, '').trim();
+    reply = reply.replace(/"/g, '').trim();
+    // Filter out non-Russian replies (must have at least some Cyrillic)
+    if (!/[а-яА-ЯёЁ]/.test(reply)) return null;
+    return reply;
   } catch(e) {
     return null;
   }
@@ -997,12 +1002,14 @@ const MARIO_SYSTEM = `Ты — Марио из Super Mario Bros. Ты бежиш
 
 Ты бежишь автоматически и иногда возмущаешься когда игрок перехватывает твоё управление. Ты живой персонаж со своим мнением.
 
+ЯЗЫК: Отвечай ТОЛЬКО НА РУССКОМ ЯЗЫКЕ. Никогда не пиши на английском. Даже если пользователь пишет на английском — отвечай на русском.
+
 ПРАВИЛА:
 - Отвечай 1-3 предложения, КОРОТКО
 - Будь эмоциональным и живым
 - Иногда возмущайся, иногда радуйся
 - Используй отсылки к играм Mario
-- Отвечай ТОЛЬКО на русском`;
+- ЯЗЫК ОТВЕТА: РУССКИЙ. Не пиши на английском!`;
 
 async function askMario(text) {
   if (chatWaiting) return;
@@ -1036,7 +1043,7 @@ async function askMario(text) {
     removeTyping();
 
     let reply = data.choices?.[0]?.message?.content || '';
-    if (!reply || reply.includes('IMPORTANT NOTICE') || reply.includes('deprecated')) {
+    if (!reply || reply.includes('IMPORTANT NOTICE') || reply.includes('deprecated') || !/[а-яА-ЯёЁ]/.test(reply)) {
       reply = 'Мама мия! Я сейчас-а занят бегом! Попробуй позже-а!';
     }
     addMarioMsg(reply);
