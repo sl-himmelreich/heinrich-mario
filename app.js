@@ -1,20 +1,9 @@
 // ═══════════════════════════════════════
 // HEINRICH MARIO — Main App
-// Direct Groq API (static-friendly, no backend needed)
+// AI: Pollinations (free, no key) + Groq fallback
 // ═══════════════════════════════════════
 
-// Groq API key — stored so the key is never in source code
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-let _groqKeyCache = '';
-function getGroqKey() {
-  if (_groqKeyCache) return _groqKeyCache;
-  try { _groqKeyCache = localStorage.getItem('groq_api_key') || ''; } catch(e) {}
-  if (!_groqKeyCache) {
-    _groqKeyCache = prompt('Введите ваш Groq API ключ (бесплатно на groq.com):') || '';
-    try { if (_groqKeyCache) localStorage.setItem('groq_api_key', _groqKeyCache); } catch(e) {}
-  }
-  return _groqKeyCache;
-}
+const POLLINATIONS_URL = "https://text.pollinations.ai/openai";
 
 const MARIO_SYSTEM = `Ты — Марио из Super Mario Bros. Ты в своём знаменитом мире — Грибное Королевство. Вокруг тебя трубы, кирпичные блоки, монеты, облака. Ты НЕ на приключении — ты живёшь обычной жизнью в этом мире.
 
@@ -29,7 +18,8 @@ const MARIO_SYSTEM = `Ты — Марио из Super Mario Bros. Ты в сво�
 - Отвечай 2-4 предложения, коротко и эмоционально
 - Будь в образе, не выходи из роли
 - Если спрашивают что происходит — описывай текущую ситуацию подробнее
-- Если пришёл гость — описывай что он делает, о чём вы говорите`;
+- Если пришёл гость — описывай что он делает, о чём вы говорите
+- Отвечай ТОЛЬКО на русском языке`;
 
 // ═══ STATE ═══
 let currentScenario = null;
@@ -40,6 +30,7 @@ let usedIds = [];
 // ═══ DOM ═══
 const $ = id => document.getElementById(id);
 const startScreen = $('start-screen');
+const tutorialScreen = $('tutorial-screen');
 const app = $('app');
 const scCounter = $('sc-counter');
 const scIcon = $('sc-icon');
@@ -79,7 +70,7 @@ const MOOD_MAP = {
   'дипломатичный': '🤝',
 };
 
-// ═══ START ═══
+// ═══ START → TUTORIAL → GAME ═══
 startScreen.addEventListener('click', () => {
   sounds.init();
   sounds.resume();
@@ -87,10 +78,19 @@ startScreen.addEventListener('click', () => {
   startScreen.style.opacity = '0';
   setTimeout(() => {
     startScreen.classList.add('hidden');
+    tutorialScreen.classList.remove('hidden');
+  }, 500);
+});
+
+$('btn-play').addEventListener('click', () => {
+  sounds.click();
+  tutorialScreen.style.opacity = '0';
+  setTimeout(() => {
+    tutorialScreen.classList.add('hidden');
     app.classList.remove('hidden');
     WORLD.init();
     loadScenario();
-  }, 500);
+  }, 400);
 });
 
 // ═══ SCENARIO ═══
@@ -206,7 +206,29 @@ function esc(t) {
   return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// ═══ AI — Direct Groq API (no backend needed) ═══
+// ═══ AI — Pollinations (free, no key) ═══
+async function callAI(messages) {
+  const resp = await fetch(POLLINATIONS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'openai',
+      messages: messages,
+      max_tokens: 250,
+      temperature: 0.9,
+      seed: Math.floor(Math.random() * 100000)
+    })
+  });
+
+  const data = await resp.json();
+  const text = data.choices?.[0]?.message?.content || '';
+  // Filter out service notices
+  if (!text || text.includes('IMPORTANT NOTICE') || text.includes('deprecated')) {
+    throw new Error('Service notice received, retrying...');
+  }
+  return text;
+}
+
 async function askMario(text, isAuto = false) {
   if (waiting) return;
   waiting = true;
@@ -232,33 +254,19 @@ async function askMario(text, isAuto = false) {
     });
     messages.push({ role: 'user', content: text });
 
-    const apiKey = getGroqKey();
-    if (!apiKey) {
-      removeTyping();
-      addMario('Мама мия! Нужен API ключ! Обнови страницу и введи ключ Groq.');
-      waiting = false;
-      chatOnline.textContent = '● онлайн';
-      chatOnline.style.color = '';
-      return;
+    let reply;
+    try {
+      reply = await callAI(messages);
+    } catch(e1) {
+      // Retry once with different seed
+      try {
+        reply = await callAI(messages);
+      } catch(e2) {
+        reply = 'Мама мия! Сервер-а занят... Попробуй ещё раз!';
+      }
     }
 
-    const resp = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: messages,
-        max_tokens: 250,
-        temperature: 0.9
-      })
-    });
-    const data = await resp.json();
     removeTyping();
-
-    const reply = data.choices?.[0]?.message?.content || 'Мама мия! Что-то пошло не так...';
     addMario(reply);
     sounds.msgIn();
 
@@ -274,7 +282,7 @@ async function askMario(text, isAuto = false) {
   } catch(e) {
     removeTyping();
     addMario('Мама мия! Связь-а потерялась... Попробуй ещё раз!');
-    console.error('Groq API error:', e);
+    console.error('AI API error:', e);
   }
 
   waiting = false;
