@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════
    HEINRICH MARIO — CSS
-   Canvas-based Mario world scene
+   Auto-run platformer + AI chat
    ═══════════════════════════════════════ */
 :root {
   --red: #E52521; --blue: #049CD8; --yellow: #FBD000;
@@ -56,61 +56,36 @@ body{font-family:var(--fb);background:var(--bg);color:var(--text);height:100vh;o
   box-shadow:0 4px 15px rgba(229,37,33,.3)}
 .tut-btn:hover{background:#c21f1c;transform:translateY(-1px)}
 .tut-btn:active{transform:scale(.96)}
-@media(max-width:480px){
-  .tut-grid{grid-template-columns:1fr}
-}
+@media(max-width:480px){.tut-grid{grid-template-columns:1fr}}
 
 /* ═══ LAYOUT ═══ */
 #app{height:100vh;display:flex;flex-direction:column}
 .topbar{display:flex;align-items:center;justify-content:space-between;
   padding:8px 14px;background:#000;border-bottom:2px solid var(--border);flex-shrink:0}
-.topbar-left,.topbar-right{display:flex;align-items:center;gap:8px}
+.topbar-left,.topbar-right,.topbar-center{display:flex;align-items:center;gap:8px}
 .mini-mario{width:22px;height:22px;image-rendering:pixelated;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='0' width='5' height='1' fill='%23E52521'/%3E%3Crect x='2' y='1' width='8' height='1' fill='%23E52521'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23FBBF8A'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%23FBBF8A'/%3E%3Crect x='2' y='5' width='5' height='1' fill='%23FBBF8A'/%3E%3C/svg%3E") no-repeat center/contain}
 .topbar-title{font-family:var(--fp);font-size:8px;color:var(--yellow);letter-spacing:1px}
-.sc-counter{font-family:var(--fp);font-size:8px;color:var(--yellow);
+.topbar-coins,.topbar-score{font-family:var(--fp);font-size:8px;color:var(--yellow);
   background:rgba(255,255,255,.05);padding:4px 10px;border-radius:4px}
 .tbtn{background:none;border:1px solid var(--border);border-radius:6px;
   padding:5px 8px;font-size:15px;cursor:pointer;transition:background .15s}
 .tbtn:hover{background:rgba(255,255,255,.06)}
 .tbtn:active{transform:scale(.93)}
+.control-badge{font-family:var(--fp);font-size:7px;color:#fff;background:var(--red);
+  padding:4px 8px;border-radius:4px;animation:badge-pulse 1s ease-in-out infinite}
+@keyframes badge-pulse{0%,100%{opacity:1}50%{opacity:.6}}
 
 .main-layout{flex:1;display:flex;overflow:hidden}
-.scene-col{flex:1;display:flex;flex-direction:column;min-width:0}
+.game-col{flex:1;display:flex;flex-direction:column;min-width:0;background:#6B8CFF}
+#game-canvas{display:block;flex:1;width:100%;min-height:0}
 .chat-col{width:340px;flex-shrink:0;display:flex;flex-direction:column;
   background:var(--panel);border-left:2px solid var(--border)}
 
-/* ═══ SCENARIO INFO ═══ */
-.sc-info{display:flex;align-items:center;gap:10px;padding:10px 14px;
-  background:linear-gradient(135deg,rgba(229,37,33,.08),rgba(4,156,216,.05));
-  border-bottom:2px solid var(--border);flex-shrink:0}
-.sc-icon{font-size:22px;flex-shrink:0}
-.sc-text{flex:1;min-width:0}
-.sc-label{font-family:var(--fp);font-size:6px;color:var(--red);letter-spacing:2px;margin-bottom:3px}
-.sc-title{font-size:14px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-mood{font-size:22px;flex-shrink:0;animation:mood-pulse 2s ease-in-out infinite}
-@keyframes mood-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
-
-/* ═══ WORLD SCENE (Canvas) ═══ */
-.world-wrap{flex:1;position:relative;overflow:hidden;background:#6B8CFF;min-height:200px}
-#world-canvas{display:block;width:100%;height:100%}
-.world-sign{position:absolute;top:12px;left:50%;transform:translateX(-50%);
-  font-family:var(--fp);font-size:7px;color:#333;background:var(--yellow);
-  padding:4px 10px;border-radius:3px;border:2px solid var(--brown);
-  text-align:center;line-height:1.5;white-space:pre;display:none;z-index:2;
-  box-shadow:0 2px 8px rgba(0,0,0,.3)}
-.world-sign.visible{display:block;animation:sign-pop .3s cubic-bezier(.34,1.56,.64,1)}
-@keyframes sign-pop{from{transform:translateX(-50%) scale(0)}to{transform:translateX(-50%) scale(1)}}
-.world-mood{position:absolute;top:16px;right:16px;font-size:28px;z-index:2;
-  animation:float-bubble 2s ease-in-out infinite;display:none;
-  text-shadow:0 2px 6px rgba(0,0,0,.3)}
-.world-mood.visible{display:block}
-@keyframes float-bubble{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-
 /* ═══ STUDIO FOOTER ═══ */
-.studio-footer{font-family:var(--fp);font-size:7px;color:var(--dim);
-  text-align:center;padding:6px 10px;background:#000;border-top:1px solid var(--border);
-  letter-spacing:1px;flex-shrink:0;opacity:.7}
+.studio-footer{font-family:var(--fp);font-size:7px;color:rgba(255,255,255,.5);
+  text-align:center;padding:4px 10px;background:rgba(0,0,0,.5);
+  letter-spacing:1px;flex-shrink:0}
 
 /* ═══ CHAT ═══ */
 .chat-head{display:flex;align-items:center;gap:8px;padding:10px 12px;
@@ -160,6 +135,6 @@ body{font-family:var(--fb);background:var(--bg);color:var(--text);height:100vh;o
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
   .main-layout{flex-direction:column}
-  .scene-col{height:50vh}
+  .game-col{height:55vh}
   .chat-col{width:100%;border-left:none;border-top:2px solid var(--border);flex:1}
 }

@@ -17,7 +17,7 @@
     <div class="title-sub">MARIO</div>
     <div class="start-mario"></div>
     <p class="blink">НАЖМИ ЧТОБЫ НАЧАТЬ</p>
-    <p class="hint">100 сценариев • AI чат • Ретро звуки</p>
+    <p class="hint">AI чат • Авто-бег • Перехват управления</p>
     <p class="studio-start">Heinrich Game Studio</p>
   </div>
   <div class="start-ground"></div>
@@ -29,19 +29,19 @@
     <div class="tut-title">КАК ИГРАТЬ</div>
     <div class="tut-grid">
       <div class="tut-card">
-        <div class="tut-icon">👀</div>
-        <div class="tut-label">НАБЛЮДАЙ</div>
-        <div class="tut-desc">Марио живёт в своём мире. У него 100 разных ситуаций — просто смотри что происходит</div>
+        <div class="tut-icon">🏃</div>
+        <div class="tut-label">АВТОБЕГ</div>
+        <div class="tut-desc">Марио сам бежит по миру. Прыгает, собирает монеты, встречает врагов</div>
       </div>
       <div class="tut-card">
         <div class="tut-icon">💬</div>
         <div class="tut-label">ОБЩАЙСЯ</div>
-        <div class="tut-desc">Пиши Марио в чат справа. Он ответит в зависимости от настроения и ситуации</div>
+        <div class="tut-desc">Пиши Марио в чат — он отвечает в облачке над головой и иногда возмущается</div>
       </div>
       <div class="tut-card">
-        <div class="tut-icon">🎲</div>
-        <div class="tut-label">НОВЫЙ СЦЕНАРИЙ</div>
-        <div class="tut-desc">Нажми кубик в правом верхнем углу или клавишу Esc чтобы сменить сценарий</div>
+        <div class="tut-icon">🎮</div>
+        <div class="tut-label">УПРАВЛЕНИЕ</div>
+        <div class="tut-desc">Стрелки ← → для движения, ↑ для прыжка. Марио может возмутиться!</div>
       </div>
       <div class="tut-card">
         <div class="tut-icon">🔊</div>
@@ -63,37 +63,19 @@
       <span class="topbar-title">HEINRICH MARIO</span>
     </div>
     <div class="topbar-center">
-      <span class="sc-counter" id="sc-counter">01/100</span>
+      <span class="topbar-coins" id="coin-count">🪙 0</span>
+      <span class="topbar-score" id="score-count">⭐ 0</span>
     </div>
     <div class="topbar-right">
       <button class="tbtn" id="btn-sound" title="Звук">🔊</button>
-      <button class="tbtn" id="btn-next" title="Новый сценарий">🎲</button>
+      <span class="control-badge hidden" id="control-badge">🎮 УПРАВЛЕНИЕ</span>
     </div>
   </header>
 
   <div class="main-layout">
-    <!-- SCENE -->
-    <div class="scene-col">
-      <!-- Scenario info -->
-      <div class="sc-info">
-        <span class="sc-icon" id="sc-icon">🏠</span>
-        <div class="sc-text">
-          <div class="sc-label">СЦЕНАРИЙ</div>
-          <div class="sc-title" id="sc-title">Загрузка...</div>
-        </div>
-        <div class="sc-mood" id="sc-mood">😊</div>
-      </div>
-
-      <!-- World Scene (Canvas) -->
-      <div class="world-wrap">
-        <canvas id="world-canvas"></canvas>
-        <!-- Sign overlay -->
-        <div class="world-sign" id="world-sign"></div>
-        <!-- Mood bubble -->
-        <div class="world-mood" id="world-mood"></div>
-      </div>
-
-      <!-- Footer -->
+    <!-- GAME -->
+    <div class="game-col">
+      <canvas id="game-canvas"></canvas>
       <div class="studio-footer">Heinrich Game Studio</div>
     </div>
 
@@ -115,9 +97,7 @@
   </div>
 </div>
 
-<script src="./scenarios.js"></script>
 <script src="./sounds.js"></script>
-<script src="./world.js"></script>
-<script src="./app.js"></script>
+<script src="./game.js"></script>
 </body>
 </html>
