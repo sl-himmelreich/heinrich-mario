@@ -733,6 +733,15 @@ let newsFetchTimer = 0;
 let newsCommentBusy = false;
 let newsCommentCooldown = 300; // start first news ~5 seconds after game start
 
+// Block politics, war, government — keep ONLY tech/science/gadget news
+const NEWS_BLOCK_RU = /полити|санкци|войн|военн|армия|армии|минобор|мо рф|нато|nato|ядерн|оруж|ракет|конфликт|фронт|мобилиз|президент|путин|байден|трамп|зеленск|депутат|госдум|парламент|выбор|партия|правительств|министр|мид |кремл|белый дом|пентагон|конгресс|сенат|закон\b|законопроект|суд\b|приговор|арест|задерж|убийств|погиб|жертв|теракт|взрыв|обстрел|удар\b|бпла|дрон.*атак|беспилотник|сбили|беженц|мигрант|протест|митинг|акция проте|церков|религ|храм|аэс(?!.*игр)|атомн(?!.*процессор)|реактор(?!.*программ)|соловьев|милонов|лебедев|боня|умер|умерш|погибш|смерт|лагерь|губернатор|области/i;
+const NEWS_BLOCK_EN = /politic|sanction|warfar|militar|army|armies|nuclear weap|missile|conflict|frontline|mobiliz|president|putin|biden|trump|zelensk|congress|senate|parliament|pentagon|kremlin|white house|court ruling|arrested|killed|victim|terror|explos|shell|strike(?!.*tech)|drone.*attack|refugee|migrant|protest|rally|church|relig|died|death/i;
+
+function isTechNews(title) {
+  if (NEWS_BLOCK_RU.test(title) || NEWS_BLOCK_EN.test(title)) return false;
+  return true;
+}
+
 async function fetchNews() {
   try {
     // Try Russian tech news first, fallback to English
@@ -744,9 +753,10 @@ async function fetchNews() {
         if (data.status === 'ok' && data.items && data.items.length > 0) {
           newsHeadlines = data.items
             .map(item => item.title.replace(/\s*-\s*[^-]+$/, '').trim()) // Remove source name
-            .filter(t => t.length > 10 && t.length < 200);
+            .filter(t => t.length > 10 && t.length < 200)
+            .filter(t => isTechNews(t)); // Strict tech-only filter
           newsIndex = 0;
-          console.log(`Новости загружены: ${newsHeadlines.length} заголовков`);
+          console.log(`Новости загружены: ${newsHeadlines.length} тех-заголовков (отфильтровано)`);
           return;
         }
       } catch(e) { /* try next */ }
@@ -764,13 +774,14 @@ async function getNewsComment(headline) {
       body: JSON.stringify({
         model: 'openai',
         messages: [
-          { role: 'system', content: `Ты — Марио из Super Mario Bros. Ты бежишь по миру и комментируешь новости технологий.
+          { role: 'system', content: `Ты — Марио из Super Mario Bros. Ты бежишь по миру и комментируешь новости ТЕХНОЛОГИЙ.
 
 ПРАВИЛА:
 - Ответь ОДНИМ коротким предложением (15 слов макс)
 - Говори как Марио: "Мама мия!", "Ваху!", итальянский акцент с "-а" на конце слов
 - Прокомментируй новость с юмором, удивлением или возмущением
 - Связывай с миром Mario если можно
+- ТОЛЬКО про технологии, гаджеты, игры, науку. НИКАКОЙ политики!
 - Отвечай на русском` },
           { role: 'user', content: `Прокомментируй новость: "${headline}"` }
         ],
