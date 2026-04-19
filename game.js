@@ -722,25 +722,86 @@ function drawSpeechBubble(x, y, text) {
   ctx.restore();
 }
 
-// ═══ NEWS SYSTEM ═══
-const NEWS_RSS_URL = 'https://api.rss2json.com/v1/api.json?rss_url=';
-const GOOGLE_NEWS_TECH_RU = 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FuSjFHZ0pTVlNnQVAB?hl=ru&gl=RU&ceid=RU:ru';
-const GOOGLE_NEWS_TECH_EN = 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FuSjFHZ0pTVlNnQVAB?hl=en&gl=US&ceid=US:en';
+// ═══ ШКОЛЬНЫЕ ПРАВИЛА И ЗАДАЧИ (4 КЛАСС) ═══
 
-let newsHeadlines = [];
-let newsIndex = 0;
-let newsFetchTimer = 0;
-let newsCommentBusy = false;
-let newsCommentCooldown = 300; // start first news ~5 seconds after game start
+// Русский язык — правила для 4 класса
+const RULES_RUSSIAN = [
+  'ЖИ-ШИ пиши с буквой И: жизнь, широкий, машина',
+  'ЧА-ЩА пиши с буквой А: часы, роща, чаща',
+  'ЧУ-ЩУ пиши с буквой У: чудо, щука, кричу',
+  'ЧК, ЧН пишутся без ь: речка, ночной, конечно',
+  'Безударную гласную проверяй ударением: вода́ — во́ды, земля́ — зе́мли',
+  'Парную согласную на конце слова проверяй: дуб — дубы, мороз — морозы',
+  'Непроизносимую согласную проверяй: сердце — сердечный, солнце — солнечный',
+  'Разделительный Ь пишется перед Е, Ё, Ю, Я, И: семья, вьюга, соловьи',
+  'Разделительный Ъ пишется после приставки перед Е, Ё, Ю, Я: объявление, съезд',
+  'Имена собственные пишутся с большой буквы: Москва, Россия, Иван',
+  'Предлоги со словами пишутся раздельно: в лесу, на столе, под деревом',
+  'НЕ с глаголами пишется раздельно: не знаю, не хочу, не бегу',
+  'Склонения сущ.: 1-е (страна, дядя), 2-е (конь, окно), 3-е (рожь, мышь)',
+  'Спряжения глаголов: I (-ешь, -ет) и II (-ишь, -ит). Нести, писать — I; смотреть, дышать — II',
+  'Глаголы-исключения II спр.: гнать, дышать, держать, зависеть, видеть, слышать, обидеть, терпеть, вертеть, ненавидеть, смотреть',
+  'Окончание -ТСЯ у глаголов (что делает? — без Ь), -ТЬСЯ (что делать? — с Ь)',
+  'Однородные члены предложения разделяются запятыми: Я люблю яблоки, груши и бананы',
+  'Сложное предложение — две основы, между ними запятая: Солнце село, и звёзды зажглись',
+  'Приставки на З/С: перед звонкой пиши З (разбить), перед глухой — С (расписать)',
+  'Части слова: приставка-корень-суффикс-окончание. Например: под-снеж-н-ик',
+  'Части речи: сущ., прил., глагол, нареч., местоим., числит., предлог, союз',
+  'Падежи: Именительный, Родительный, Дательный, Винительный, Творительный, Предложный',
+  'Ь на конце сущ. после шипящих — 3 склонение: ночь, рожь, мышь (2 скл. — без Ь: меч, луч)',
+  'Двойные согласные нужно запомнить: класс, суббота, аллея, грамм, коллекция',
+  'Прямая речь: «Привет!» — сказал Марио. Марио сказал: «Привет!»',
+];
 
-// Block politics, war, government — keep ONLY tech/science/gadget news
-const NEWS_BLOCK_RU = /полити|санкци|войн|военн|армия|армии|минобор|мо рф|нато|nato|ядерн|оруж|ракет|конфликт|фронт|мобилиз|президент|путин|байден|трамп|зеленск|депутат|госдум|парламент|выбор|партия|правительств|министр|мид |кремл|белый дом|пентагон|конгресс|сенат|закон\b|законопроект|суд\b|приговор|арест|задерж|убийств|погиб|жертв|теракт|взрыв|обстрел|удар\b|бпла|дрон.*атак|беспилотник|сбили|беженц|мигрант|протест|митинг|акция проте|церков|религ|храм|аэс(?!.*игр)|атомн(?!.*процессор)|реактор(?!.*программ)|соловьев|милонов|лебедев|боня|умер|умерш|погибш|смерт|лагерь|губернатор|области/i;
-const NEWS_BLOCK_EN = /politic|sanction|warfar|militar|army|armies|nuclear weap|missile|conflict|frontline|mobiliz|president|putin|biden|trump|zelensk|congress|senate|parliament|pentagon|kremlin|white house|court ruling|arrested|killed|victim|terror|explos|shell|strike(?!.*tech)|drone.*attack|refugee|migrant|protest|rally|church|relig|died|death/i;
+// Математика — правила и факты для 4 класса
+const RULES_MATH = [
+  'Порядок действий: сначала скобки, потом × и ÷, потом + и −',
+  'Чтобы найти неизвестное слагаемое — из суммы вычитаем известное',
+  'Чтобы найти неизвестный множитель — произведение делим на известный',
+  'Признак делимости на 2: последняя цифра чётная (0, 2, 4, 6, 8)',
+  'Признак делимости на 3: сумма цифр делится на 3. Пример: 123 → 1+2+3=6 → да!',
+  'Признак делимости на 5: кончается на 0 или 5',
+  'Признак делимости на 9: сумма цифр делится на 9. Пример: 729 → 7+2+9=18 → да!',
+  'Площадь прямоугольника = длина × ширина. S = a × b',
+  'Периметр прямоугольника = (a + b) × 2',
+  'Площадь квадрата = сторона × сторона. S = a × a',
+  '1 км = 1000 м, 1 м = 100 см, 1 см = 10 мм',
+  '1 т = 1000 кг, 1 кг = 1000 г, 1 ц = 100 кг',
+  '1 час = 60 минут, 1 минута = 60 секунд, 1 сутки = 24 часа',
+  'Скорость = расстояние ÷ время. Расстояние = скорость × время',
+  'Дробь: числитель сверху, знаменатель снизу. 3/4 — три четвёртых',
+  'Сравнение дробей: при одинаковом знаменателе больше та, где числитель больше. 5/8 > 3/8',
+  'В столбик: сложение и вычитание многозначных чисел — поразрядно, справа налево',
+  'Умножение на 10, 100, 1000: припиши справа 1, 2 или 3 нуля. 25 × 100 = 2500',
+  'Деление на 10, 100, 1000: убери 1, 2 или 3 нуля справа. 4500 ÷ 100 = 45',
+  'Среднее арифметическое: сложи все числа и раздели на их количество. (2+4+6) ÷ 3 = 4',
+  'Виды углов: острый (< 90°), прямой (= 90°), тупой (> 90°), развёрнутый (= 180°)',
+  'Луч — часть прямой с началом, но без конца. Отрезок — с двумя концами',
+  'Диагональ прямоугольника делит его на два равных треугольника',
+  'Римские цифры: I=1, V=5, X=10, L=50, C=100. XIV=14, XXIX=29',
+];
 
-function isTechNews(title) {
-  if (NEWS_BLOCK_RU.test(title) || NEWS_BLOCK_EN.test(title)) return false;
-  return true;
-}
+// Олимпиадные задачки по математике, 4 класс
+const OLYMPIAD_TASKS = [
+  { q: 'Задачка: В корзине 5 яблок. Как разделить их между 5 детьми, чтобы одно яблоко осталось в корзине?', a: 'Ответ: Один ребёнок получит яблоко вместе с корзиной!' },
+  { q: 'Задачка: Найди число: оно двузначное, сумма цифр равна 10, а разность цифр равна 4', a: 'Ответ: 73 (или 37). 7+3=10, 7−3=4' },
+  { q: 'Задачка: У Марио 100 монет. Он собрал ещё столько же и ещё полстолька. Сколько всего?', a: 'Ответ: 100+100+50 = 250 монет!' },
+  { q: 'Задачка: Какое число нужно умножить само на себя, чтобы получить 144?', a: 'Ответ: 12 × 12 = 144' },
+  { q: 'Задачка: Улитка лезет по столбу 10 м. За день поднимается на 3 м, ночью сползает на 2 м. На какой день долезет?', a: 'Ответ: На 8-й день! 7 дней по 1 м = 7 м, на 8-й день +3 м = 10 м' },
+  { q: 'Задачка: Книга стоит 100 руб + половина книги. Сколько стоит книга?', a: 'Ответ: 200 руб! Половина книги = 100 руб, значит вся = 200' },
+  { q: 'Задачка: Купа поставил 12 ловушек в 2 ряда по 6. Марио обезвредил 1/3. Сколько осталось?', a: 'Ответ: 12 − 12 × 1/3 = 12 − 4 = 8 ловушек' },
+  { q: 'Задачка: Сумма трёх подряд идущих чисел = 30. Какие это числа?', a: 'Ответ: 9, 10, 11. Среднее = 30 ÷ 3 = 10' },
+  { q: 'Задачка: Луиджи старше Марио на 3 года. Вместе им 21 год. Сколько лет каждому?', a: 'Ответ: Марио 9 лет, Луиджи 12 лет! (21−3) ÷ 2 = 9' },
+  { q: 'Задачка: В комнате 4 угла, в каждом сидит кошка. Напротив каждой — 3 кошки. Сколько кошек?', a: 'Ответ: 4 кошки! Каждая видит остальных трёх' },
+  { q: 'Задачка: Столяр распилил бревно на 5 частей. Сколько распилов он сделал?', a: 'Ответ: 4 распила! Распилов всегда на 1 меньше чем частей' },
+  { q: 'Задачка: Вставь знаки (+, −, ×, ÷): 8 _ 4 _ 2 = 6', a: 'Ответ: 8 ÷ 4 + 2 = 6 или 8 − 4 + 2 = 6' },
+];
+
+let eduItems = [];   // перемешанные правила и задачки
+let eduIndex = 0;
+let eduBusy = false;
+let newsCommentCooldown = 300; // start first item ~5 seconds after game start
+let newsCommentBusy = false;   // alias for update() compatibility
 
 // Shuffle array (Fisher-Yates)
 function shuffleArray(arr) {
@@ -751,53 +812,99 @@ function shuffleArray(arr) {
   return arr;
 }
 
-async function fetchNews() {
-  try {
-    // Cache-busting: add timestamp so every session gets fresh data
-    const cacheBust = '&_t=' + Date.now();
-    const urls = [GOOGLE_NEWS_TECH_RU, GOOGLE_NEWS_TECH_EN];
-    for (const feedUrl of urls) {
-      try {
-        const resp = await fetch(NEWS_RSS_URL + encodeURIComponent(feedUrl) + cacheBust);
-        const data = await resp.json();
-        if (data.status === 'ok' && data.items && data.items.length > 0) {
-          newsHeadlines = data.items
-            .map(item => item.title.replace(/\s*-\s*[^-]+$/, '').trim())
-            .filter(t => t.length > 10 && t.length < 200)
-            .filter(t => isTechNews(t));
-          // Shuffle so every session shows different order
-          shuffleArray(newsHeadlines);
-          newsIndex = 0;
-          console.log(`Новости загружены: ${newsHeadlines.length} тех-заголовков (отфильтровано)`);
-          return;
-        }
-      } catch(e) { /* try next */ }
-    }
-  } catch(e) {
-    console.warn('Ошибка загрузки новостей:', e);
+function buildEduList() {
+  // ~70% rules (Russian + Math), ~30% olympiad tasks
+  const rules = [...RULES_RUSSIAN.map(r => ({ type: 'rule-ru', text: r })),
+                 ...RULES_MATH.map(r => ({ type: 'rule-math', text: r }))];
+  const olymp = OLYMPIAD_TASKS.map(t => ({ type: 'olympiad', q: t.q, a: t.a }));
+  shuffleArray(rules);
+  shuffleArray(olymp);
+  // Interleave: 2-3 rules, then 1 olympiad
+  eduItems = [];
+  let ri = 0, oi = 0;
+  while (ri < rules.length || oi < olymp.length) {
+    const batch = 2 + Math.floor(Math.random() * 2); // 2 or 3 rules
+    for (let k = 0; k < batch && ri < rules.length; k++) eduItems.push(rules[ri++]);
+    if (oi < olymp.length) eduItems.push(olymp[oi++]);
   }
+  eduIndex = 0;
+  console.log(`Уроки готовы: ${eduItems.length} элементов (правила + олимпиадные задачки)`);
 }
 
-async function getNewsComment(headline) {
+const fallbackThoughts = [
+  "Бежим-а и учимся-а!", "Учиться-а весело!", "Где мои монетки-а?",
+  "Луиджи не знал это правило-а!", "Хочу пасту-а и уроки-а!",
+  "Мама мия, математика-а!", "Русский язык-а красивый!",
+  "Ваху! Решим задачку-а!", "Монетки звенят, мозги работают-а!",
+];
+
+async function showNewsComment() {
+  if (newsCommentBusy) return;
+  newsCommentBusy = true;
+
+  if (eduItems.length === 0) buildEduList();
+  if (eduIndex >= eduItems.length) {
+    shuffleArray(eduItems);
+    eduIndex = 0;
+  }
+
+  const item = eduItems[eduIndex++];
+
+  if (item.type === 'olympiad') {
+    // Olympiad: show question in bubble + chat, then answer after pause
+    const icon = '🏆';
+    addSystemMsg(icon + ' ' + item.q);
+    const shortQ = item.q.length > 60 ? item.q.substring(0, 57) + '...' : item.q;
+    showSpeech(icon + ' ' + shortQ);
+
+    // Show answer after 6 seconds
+    const answer = item.a;
+    setTimeout(() => {
+      if (running) {
+        showSpeech('✅ ' + answer);
+        addMarioMsg('✅ ' + answer);
+      }
+    }, 6000);
+  } else {
+    // Rule: show in bubble + chat, get Mario's fun comment
+    const icon = item.type === 'rule-ru' ? '📖' : '📊';
+    addSystemMsg(icon + ' ' + item.text);
+    const shortR = item.text.length > 60 ? item.text.substring(0, 57) + '...' : item.text;
+    showSpeech(icon + ' ' + shortR);
+
+    // Get Mario's comment via AI
+    const comment = await getEduComment(item.text, item.type);
+    if (comment && running) {
+      setTimeout(() => {
+        if (running) {
+          showSpeech(comment);
+          addMarioMsg(icon + ' ' + comment);
+        }
+      }, 5000);
+    }
+  }
+  newsCommentBusy = false;
+}
+
+async function getEduComment(rule, type) {
   try {
+    const subj = type === 'rule-ru' ? 'русский язык' : 'математика';
     const resp = await fetch(AI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'openai',
         messages: [
-          { role: 'system', content: `Ты — Марио из Super Mario Bros. Ты бежишь по миру и комментируешь новости ТЕХНОЛОГИЙ.
+          { role: 'system', content: `Ты — Марио из Super Mario Bros. Ты учишь детей 4 класса предмету "${subj}".
 
-ЯЗЫК: Отвечай ТОЛЬКО НА РУССКОМ. Никогда не пиши на английском.
+ЯЗЫК: Отвечай ТОЛЬКО НА РУССКОМ. Никогда на английском.
 
 ПРАВИЛА:
-- Ответь ОДНИМ коротким предложением НА РУССКОМ (15 слов макс)
+- ОДНО короткое предложение НА РУССКОМ (15 слов макс)
 - Говори как Марио: "Мама мия!", "Ваху!", итальянский акцент с "-а" на конце слов
-- Прокомментируй новость с юмором, удивлением или возмущением
-- Связывай с миром Mario если можно
-- ТОЛЬКО про технологии, гаджеты, игры, науку. НИКАКОЙ политики!
-- ЯЗЫК ОТВЕТА: РУССКИЙ. Не пиши на английском!` },
-          { role: 'user', content: `Прокомментируй новость: "${headline}"` }
+- Поясни правило простым языком с юмором
+- Связывай с миром Mario если можно` },
+          { role: 'user', content: `Прокомментируй правило: "${rule}"` }
         ],
         max_tokens: 60,
         temperature: 1.0,
@@ -806,11 +913,8 @@ async function getNewsComment(headline) {
     });
     const data = await resp.json();
     let reply = data.choices?.[0]?.message?.content || '';
-    if (!reply || reply.includes('IMPORTANT NOTICE') || reply.includes('deprecated') || reply.length < 5) {
-      return null;
-    }
+    if (!reply || reply.includes('IMPORTANT NOTICE') || reply.includes('deprecated') || reply.length < 5) return null;
     reply = reply.replace(/"/g, '').trim();
-    // Filter out non-Russian replies (must have at least some Cyrillic)
     if (!/[а-яА-ЯёЁ]/.test(reply)) return null;
     return reply;
   } catch(e) {
@@ -818,56 +922,7 @@ async function getNewsComment(headline) {
   }
 }
 
-const fallbackThoughts = [
-  "Бежим-а, бежим-а...", "Что за красивый-а день!", "Где мои монетки-а?",
-  "Пич-а, я скучаю!", "Луиджи наверно опять боится-а...", "Хочу пасту-а!",
-  "Эта труба подозрительная-а...", "Грибы, грибы, везде грибы-а!",
-  "Мне нужна звезда-а!", "Боузер, я иду-а за тобой!",
-  "Ваху! Какой прыжок-а!", "Монетки звенят в кармане-а!",
-];
-
-async function showNewsComment() {
-  if (newsCommentBusy) return;
-  newsCommentBusy = true;
-
-  // Fetch news on first call or periodically
-  if (newsHeadlines.length === 0 || newsFetchTimer <= 0) {
-    await fetchNews();
-    newsFetchTimer = 25; // refetch every ~25 news cycles (~6 min)
-  }
-  newsFetchTimer--;
-
-  // If we have news, comment on it
-  if (newsHeadlines.length > 0) {
-    const headline = newsHeadlines[newsIndex % newsHeadlines.length];
-    newsIndex++;
-
-    // Show news headline in chat as system message
-    addSystemMsg('📰 ' + headline);
-
-    // Always show headline in speech bubble first
-    const shortHL = headline.length > 60 ? headline.substring(0, 57) + '...' : headline;
-    showSpeech('📰 ' + shortHL);
-
-    // Get Mario's AI comment about the news
-    const comment = await getNewsComment(headline);
-    if (comment && running) {
-      // After a pause, show Mario's comment in a new bubble
-      setTimeout(() => {
-        if (running) {
-          showSpeech(comment);
-          addMarioMsg('📰 ' + comment);
-        }
-      }, 4500); // show comment after headline fades
-    }
-  } else {
-    // Fallback to random thoughts while news loads
-    showSpeech(fallbackThoughts[Math.floor(Math.random() * fallbackThoughts.length)]);
-  }
-  newsCommentBusy = false;
-}
-
-// News fetch is triggered from startGame()
+// Education system is initialized from startGame()
 
 // ═══ DEBUG FPS ═══
 let _frames = 0, _last = performance.now(), _fps = 0, _ft = 0, _prev = 0;
@@ -924,8 +979,8 @@ function startGame() {
   resize();
   gameLoop();
   addSystemMsg('★ Марио бежит по миру! Пиши ему в чат или перехвати управление стрелками ★');
-  addSystemMsg('📰 Загрузка последних тех-новостей...');
-  fetchNews();
+  addSystemMsg('📚 Уроки по русскому языку и математике для 4 класса!');
+  buildEduList();
 }
 
 // ═══ SCREENS ═══
