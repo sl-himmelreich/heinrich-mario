@@ -45,7 +45,7 @@ let chatHistory = [];
 // Speech bubble
 let speechText = '';
 let speechTimer = 0;
-const SPEECH_DURATION = 180; // ~3 seconds at 60fps
+const SPEECH_DURATION = 240; // ~4 seconds at 60fps
 
 // ═══ MARIO ═══
 const mario = {
@@ -221,22 +221,30 @@ function update() {
     // Auto-jump over obstacles/gaps
     mario.autoJumpCooldown = Math.max(0, mario.autoJumpCooldown - 1);
     if (mario.onGround && mario.autoJumpCooldown === 0) {
-      // Check ahead for obstacles or gaps
-      const aheadX = mario.x + mario.w + 16;
+      // Check ahead for obstacles or gaps (look further to avoid pits)
+      const aheadX = mario.x + mario.w + 8;
       const feetY = mario.y + mario.h;
-      const groundAhead = worldTiles.some(t =>
-        isSolid(t.type) && t.x < aheadX + 20 && t.x + TILE > aheadX &&
-        t.y >= feetY - 4 && t.y < feetY + TILE * 2
-      );
+      // Check 2-3 tiles ahead for ground
+      let groundAhead = false;
+      for (let check = 0; check < 3; check++) {
+        const cx = aheadX + check * TILE;
+        if (worldTiles.some(t =>
+          isSolid(t.type) && t.x < cx + TILE && t.x + TILE > cx &&
+          t.y >= feetY - 4 && t.y < feetY + TILE * 2
+        )) { groundAhead = true; break; }
+      }
       const wallAhead = worldTiles.some(t =>
-        isSolid(t.type) && t.x < aheadX + 8 && t.x + TILE > aheadX &&
+        isSolid(t.type) && t.x < aheadX + 12 && t.x + TILE > aheadX &&
         t.y < feetY - 4 && t.y + TILE > mario.y
       );
+      // Also detect gap right ahead using groundCols
+      const currentCol = Math.floor((mario.x + mario.w) / TILE);
+      const gapAhead = !groundCols.has(currentCol + 1) || !groundCols.has(currentCol + 2);
 
-      if (!groundAhead || wallAhead) {
+      if ((!groundAhead && gapAhead) || wallAhead || gapAhead) {
         mario.vy = JUMP_FORCE;
         mario.onGround = false;
-        mario.autoJumpCooldown = 30;
+        mario.autoJumpCooldown = 25;
       }
     }
 
@@ -291,12 +299,22 @@ function update() {
     }
   }
 
-  // Fall into pit → respawn
+  // Fall into pit → respawn AHEAD of the gap
   if (mario.y > H + 100) {
-    mario.x = cameraX + 100;
-    mario.y = 0;
+    // Find the next solid ground column after current cameraX
+    let respawnX = cameraX + W * 0.5;
+    for (let col = Math.floor(respawnX / TILE); col < Math.floor(respawnX / TILE) + 20; col++) {
+      if (groundCols.has(col)) {
+        respawnX = col * TILE;
+        break;
+      }
+    }
+    mario.x = respawnX;
+    mario.y = 10 * TILE;
     mario.vy = 0;
-    showSpeech("Мама мия! Я упал-а в пропасть!");
+    if (speechTimer <= 60) {
+      showSpeech("Мама мия! Я упал-а в пропасть!");
+    }
   }
 
   // ─── COINS ───
@@ -354,16 +372,12 @@ function update() {
     else mario.state = 'run';
   }
 
-  // ─── RANDOM COMMENTS ───
-  if (frame % 600 === 0 && !playerControl && speechTimer === 0) {
-    const thoughts = [
-      "Бежим-а, бежим-а...", "Что за красивый-а день!", "Где мои монетки-а?",
-      "Пич-а, я скучаю!", "Луиджи наверно опять боится-а...", "Хочу пасту-а!",
-      "Эта труба подозрительная-а...", "Грибы, грибы, везде грибы-а!",
-      "Мне нужна звезда-а!", "Боузер, я иду-а за тобой!",
-      "Ваху! Какой прыжок-а!", "Монетки звенят в кармане-а!",
-    ];
-    showSpeech(thoughts[Math.floor(Math.random() * thoughts.length)]);
+  // ─── NEWS COMMENTS ───
+  // Every ~15 seconds Mario comments on tech news
+  newsCommentCooldown = Math.max(0, newsCommentCooldown - 1);
+  if (newsCommentCooldown === 0 && !playerControl && speechTimer === 0 && !newsCommentBusy) {
+    newsCommentCooldown = 900; // ~15 seconds at 60fps
+    showNewsComment();
   }
 }
 
@@ -708,6 +722,120 @@ function drawSpeechBubble(x, y, text) {
   ctx.restore();
 }
 
+// ═══ NEWS SYSTEM ═══
+const NEWS_RSS_URL = 'https://api.rss2json.com/v1/api.json?rss_url=';
+const GOOGLE_NEWS_TECH_RU = 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FuSjFHZ0pTVlNnQVAB?hl=ru&gl=RU&ceid=RU:ru';
+const GOOGLE_NEWS_TECH_EN = 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FuSjFHZ0pTVlNnQVAB?hl=en&gl=US&ceid=US:en';
+
+let newsHeadlines = [];
+let newsIndex = 0;
+let newsFetchTimer = 0;
+let newsCommentBusy = false;
+let newsCommentCooldown = 300; // start first news ~5 seconds after game start
+
+async function fetchNews() {
+  try {
+    // Try Russian tech news first, fallback to English
+    const urls = [GOOGLE_NEWS_TECH_RU, GOOGLE_NEWS_TECH_EN];
+    for (const feedUrl of urls) {
+      try {
+        const resp = await fetch(NEWS_RSS_URL + encodeURIComponent(feedUrl));
+        const data = await resp.json();
+        if (data.status === 'ok' && data.items && data.items.length > 0) {
+          newsHeadlines = data.items
+            .map(item => item.title.replace(/\s*-\s*[^-]+$/, '').trim()) // Remove source name
+            .filter(t => t.length > 10 && t.length < 200);
+          newsIndex = 0;
+          console.log(`Новости загружены: ${newsHeadlines.length} заголовков`);
+          return;
+        }
+      } catch(e) { /* try next */ }
+    }
+  } catch(e) {
+    console.warn('Ошибка загрузки новостей:', e);
+  }
+}
+
+async function getNewsComment(headline) {
+  try {
+    const resp = await fetch(AI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai',
+        messages: [
+          { role: 'system', content: `Ты — Марио из Super Mario Bros. Ты бежишь по миру и комментируешь новости технологий.
+
+ПРАВИЛА:
+- Ответь ОДНИМ коротким предложением (15 слов макс)
+- Говори как Марио: "Мама мия!", "Ваху!", итальянский акцент с "-а" на конце слов
+- Прокомментируй новость с юмором, удивлением или возмущением
+- Связывай с миром Mario если можно
+- Отвечай на русском` },
+          { role: 'user', content: `Прокомментируй новость: "${headline}"` }
+        ],
+        max_tokens: 60,
+        temperature: 1.0,
+        seed: Math.floor(Math.random() * 100000)
+      })
+    });
+    const data = await resp.json();
+    let reply = data.choices?.[0]?.message?.content || '';
+    if (!reply || reply.includes('IMPORTANT NOTICE') || reply.includes('deprecated') || reply.length < 5) {
+      return null; // fallback to headline
+    }
+    return reply.replace(/"/g, '').trim();
+  } catch(e) {
+    return null;
+  }
+}
+
+const fallbackThoughts = [
+  "Бежим-а, бежим-а...", "Что за красивый-а день!", "Где мои монетки-а?",
+  "Пич-а, я скучаю!", "Луиджи наверно опять боится-а...", "Хочу пасту-а!",
+  "Эта труба подозрительная-а...", "Грибы, грибы, везде грибы-а!",
+  "Мне нужна звезда-а!", "Боузер, я иду-а за тобой!",
+  "Ваху! Какой прыжок-а!", "Монетки звенят в кармане-а!",
+];
+
+async function showNewsComment() {
+  if (newsCommentBusy) return;
+  newsCommentBusy = true;
+
+  // Fetch news on first call or periodically
+  if (newsHeadlines.length === 0 || newsFetchTimer <= 0) {
+    await fetchNews();
+    newsFetchTimer = 25; // refetch every ~25 news cycles (~6 min)
+  }
+  newsFetchTimer--;
+
+  // If we have news, comment on it
+  if (newsHeadlines.length > 0) {
+    const headline = newsHeadlines[newsIndex % newsHeadlines.length];
+    newsIndex++;
+
+    // Show news headline in chat as system message
+    addSystemMsg('📰 ' + headline);
+
+    // Get Mario's AI comment about the news
+    const comment = await getNewsComment(headline);
+    if (comment && running) {
+      showSpeech(comment);
+      addMarioMsg('📰 ' + comment);
+    } else {
+      // Fallback: show shortened headline in speech bubble
+      const short = headline.length > 45 ? headline.substring(0, 42) + '...' : headline;
+      showSpeech('📰 ' + short);
+    }
+  } else {
+    // Fallback to random thoughts while news loads
+    showSpeech(fallbackThoughts[Math.floor(Math.random() * fallbackThoughts.length)]);
+  }
+  newsCommentBusy = false;
+}
+
+// News fetch is triggered from startGame()
+
 // ═══ DEBUG FPS ═══
 let _frames = 0, _last = performance.now(), _fps = 0, _ft = 0, _prev = 0;
 function updateDebug() {
@@ -763,6 +891,8 @@ function startGame() {
   resize();
   gameLoop();
   addSystemMsg('★ Марио бежит по миру! Пиши ему в чат или перехвати управление стрелками ★');
+  addSystemMsg('📰 Загрузка последних тех-новостей...');
+  fetchNews();
 }
 
 // ═══ SCREENS ═══
