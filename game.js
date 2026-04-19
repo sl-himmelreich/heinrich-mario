@@ -45,7 +45,7 @@ let chatHistory = [];
 // Speech bubble
 let speechText = '';
 let speechTimer = 0;
-const SPEECH_DURATION = 240; // ~4 seconds at 60fps
+const SPEECH_DURATION = 300; // ~5 seconds at 60fps
 
 // ═══ MARIO ═══
 const mario = {
@@ -655,10 +655,10 @@ function drawMario(x, y) {
 
 function drawSpeechBubble(x, y, text) {
   ctx.save();
-  ctx.font = '10px "Press Start 2P"';
+  ctx.font = '11px "Press Start 2P"';
 
   // Word wrap
-  const maxW = 220;
+  const maxW = 260;
   const words = text.split(' ');
   const lines = [];
   let line = '';
@@ -742,19 +742,31 @@ function isTechNews(title) {
   return true;
 }
 
+// Shuffle array (Fisher-Yates)
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 async function fetchNews() {
   try {
-    // Try Russian tech news first, fallback to English
+    // Cache-busting: add timestamp so every session gets fresh data
+    const cacheBust = '&_t=' + Date.now();
     const urls = [GOOGLE_NEWS_TECH_RU, GOOGLE_NEWS_TECH_EN];
     for (const feedUrl of urls) {
       try {
-        const resp = await fetch(NEWS_RSS_URL + encodeURIComponent(feedUrl));
+        const resp = await fetch(NEWS_RSS_URL + encodeURIComponent(feedUrl) + cacheBust);
         const data = await resp.json();
         if (data.status === 'ok' && data.items && data.items.length > 0) {
           newsHeadlines = data.items
-            .map(item => item.title.replace(/\s*-\s*[^-]+$/, '').trim()) // Remove source name
+            .map(item => item.title.replace(/\s*-\s*[^-]+$/, '').trim())
             .filter(t => t.length > 10 && t.length < 200)
-            .filter(t => isTechNews(t)); // Strict tech-only filter
+            .filter(t => isTechNews(t));
+          // Shuffle so every session shows different order
+          shuffleArray(newsHeadlines);
           newsIndex = 0;
           console.log(`Новости загружены: ${newsHeadlines.length} тех-заголовков (отфильтровано)`);
           return;
@@ -828,15 +840,20 @@ async function showNewsComment() {
     // Show news headline in chat as system message
     addSystemMsg('📰 ' + headline);
 
+    // Always show headline in speech bubble first
+    const shortHL = headline.length > 60 ? headline.substring(0, 57) + '...' : headline;
+    showSpeech('📰 ' + shortHL);
+
     // Get Mario's AI comment about the news
     const comment = await getNewsComment(headline);
     if (comment && running) {
-      showSpeech(comment);
-      addMarioMsg('📰 ' + comment);
-    } else {
-      // Fallback: show shortened headline in speech bubble
-      const short = headline.length > 45 ? headline.substring(0, 42) + '...' : headline;
-      showSpeech('📰 ' + short);
+      // After a pause, show Mario's comment in a new bubble
+      setTimeout(() => {
+        if (running) {
+          showSpeech(comment);
+          addMarioMsg('📰 ' + comment);
+        }
+      }, 4500); // show comment after headline fades
     }
   } else {
     // Fallback to random thoughts while news loads
