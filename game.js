@@ -1177,6 +1177,21 @@ btnSound.addEventListener('click', () => {
 // Prevent arrow keys from scrolling chat when game has focus
 chatInput.addEventListener('focus', () => { /* keep chat active */ });
 
+// ═══ VISUAL VIEWPORT HANDLING ═══
+// Mobile browsers hide/show address bar dynamically, which can cover our UI.
+// We use visualViewport to reposition touch controls and chat toggle.
+function updateViewportVars() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  document.documentElement.style.setProperty('--vvh', h + 'px');
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', updateViewportVars);
+  window.visualViewport.addEventListener('scroll', updateViewportVars);
+}
+window.addEventListener('resize', updateViewportVars);
+updateViewportVars();
+
 // ═══ TOUCH CONTROLS (mobile) ═══
 function bindTouchBtn(el, key) {
   if (!el) return;

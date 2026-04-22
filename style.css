@@ -12,8 +12,9 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;width:100%;overscroll-behavior:none}
 body{font-family:var(--fb);background:var(--bg);color:var(--text);
-  height:100vh;height:100dvh;overflow:hidden;
+  height:100vh;height:100svh;overflow:hidden;
   -webkit-user-select:none;user-select:none;touch-action:manipulation}
+
 input,textarea{-webkit-user-select:text;user-select:text}
 .hidden{display:none!important}
 
@@ -63,7 +64,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 @media(max-width:480px){.tut-grid{grid-template-columns:1fr}}
 
 /* ═══ LAYOUT ═══ */
-#app{height:100vh;display:flex;flex-direction:column}
+#app{height:100vh;height:100svh;display:flex;flex-direction:column}
 .topbar{display:flex;align-items:center;justify-content:space-between;
   padding:8px 14px;background:#000;border-bottom:2px solid var(--border);flex-shrink:0}
 .topbar-left,.topbar-right,.topbar-center{display:flex;align-items:center;gap:8px}
@@ -91,9 +92,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .chat-close:hover{color:var(--text);background:rgba(255,255,255,.05)}
 
 /* ═══ TOUCH CONTROLS (mobile only) ═══ */
-.touch-controls{display:none;position:absolute;left:0;right:0;bottom:0;
-  padding:0 14px 14px;pointer-events:none;
-  justify-content:space-between;align-items:flex-end;z-index:10}
+/* Positioned via --vvh (visualViewport height) so they stay above
+   the dynamic address bar on mobile browsers. */
+.touch-controls{display:none;position:fixed;left:0;right:0;
+  top:calc(var(--vvh, 100vh) - 88px);
+  padding:0 14px;pointer-events:none;
+  justify-content:space-between;align-items:flex-end;z-index:60}
 .tc-left,.tc-right{display:flex;gap:10px;pointer-events:auto}
 .tc-btn{width:64px;height:64px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
   background:rgba(0,0,0,.4);color:#fff;font-size:24px;line-height:1;
@@ -104,7 +108,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .tc-btn:active,.tc-btn.pressed{background:rgba(229,37,33,.7);transform:scale(.92);
   border-color:rgba(255,255,255,.85)}
 .tc-jump{width:74px;height:74px;font-size:28px;background:rgba(229,37,33,.45)}
-.chat-toggle{display:none;position:absolute;top:10px;right:10px;z-index:11;
+.chat-toggle{display:none;position:fixed;top:calc(var(--topbar-h,50px) + 4px);right:10px;z-index:11;
   width:42px;height:42px;border-radius:50%;border:2px solid rgba(255,255,255,.4);
   background:rgba(0,0,0,.45);color:#fff;font-size:20px;cursor:pointer;
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
@@ -203,7 +207,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .tut-grid{grid-template-columns:1fr}
   .tc-btn{width:56px;height:56px;font-size:22px}
   .tc-jump{width:64px;height:64px;font-size:24px}
-  .touch-controls{padding:0 10px 10px}
+  .touch-controls{padding:0 10px;top:calc(var(--vvh, 100vh) - 80px)}
 }
 
 /* Landscape phone — keep touch controls smaller, chat stays drawer */
@@ -211,5 +215,5 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .topbar{padding:4px 10px}
   .tc-btn{width:50px;height:50px;font-size:18px}
   .tc-jump{width:58px;height:58px;font-size:22px}
-  .touch-controls{padding:0 8px 8px}
+  .touch-controls{padding:0 8px;top:calc(var(--vvh, 100vh) - 70px)}
 }
