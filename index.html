@@ -2,7 +2,11 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f1a">
 <title>Heinrich Mario — AI Chat</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -41,7 +45,7 @@
       <div class="tut-card">
         <div class="tut-icon">🎮</div>
         <div class="tut-label">УПРАВЛЕНИЕ</div>
-        <div class="tut-desc">Стрелки ← → для движения, ↑ для прыжка. Марио может возмутиться!</div>
+        <div class="tut-desc">На компьютере: стрелки ← → ↑. На телефоне: кнопки ◀ ▶ ▲ на экране. Марио может возмутиться!</div>
       </div>
       <div class="tut-card">
         <div class="tut-icon">🔊</div>
@@ -75,16 +79,31 @@
   <div class="main-layout">
     <!-- GAME -->
     <div class="game-col">
-      <canvas id="game-canvas"></canvas>
+      <div class="canvas-wrap">
+        <canvas id="game-canvas"></canvas>
+        <!-- Touch controls (mobile only) -->
+        <div class="touch-controls" id="touch-controls">
+          <div class="tc-left">
+            <button class="tc-btn tc-dir" id="tc-left" aria-label="Влево">◀</button>
+            <button class="tc-btn tc-dir" id="tc-right" aria-label="Вправо">▶</button>
+          </div>
+          <div class="tc-right">
+            <button class="tc-btn tc-jump" id="tc-jump" aria-label="Прыжок">▲</button>
+          </div>
+        </div>
+        <!-- Chat toggle (mobile only) -->
+        <button class="chat-toggle" id="chat-toggle" aria-label="Чат">💬</button>
+      </div>
       <div class="studio-footer">Heinrich Game Studio</div>
     </div>
 
     <!-- CHAT -->
-    <div class="chat-col">
+    <div class="chat-col" id="chat-col">
       <div class="chat-head">
         <span class="chat-avatar">🍄</span>
         <span class="chat-name">МАРИО</span>
         <span class="chat-online" id="chat-online">● онлайн</span>
+        <button class="chat-close" id="chat-close" aria-label="Закрыть">✕</button>
       </div>
       <div class="chat-msgs" id="chat-msgs"></div>
       <div class="chat-bar">

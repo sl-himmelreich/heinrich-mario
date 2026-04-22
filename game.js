@@ -1137,6 +1137,67 @@ btnSound.addEventListener('click', () => {
 // Prevent arrow keys from scrolling chat when game has focus
 chatInput.addEventListener('focus', () => { /* keep chat active */ });
 
+// ═══ TOUCH CONTROLS (mobile) ═══
+function bindTouchBtn(el, key) {
+  if (!el) return;
+  const press = (e) => {
+    if (e) e.preventDefault();
+    if (!running) return;
+    if (!keys[key]) {
+      keys[key] = true;
+      onPlayerInput();
+    } else {
+      // refresh takeover timer while held
+      playerControlTimer = 120;
+    }
+    el.classList.add('pressed');
+  };
+  const release = (e) => {
+    if (e) e.preventDefault();
+    keys[key] = false;
+    el.classList.remove('pressed');
+  };
+  // Use pointer events for unified touch/mouse handling
+  el.addEventListener('pointerdown', press);
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+  el.addEventListener('pointerleave', release);
+  // Extra safety: block native touch gestures
+  el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  el.addEventListener('contextmenu', e => e.preventDefault());
+}
+bindTouchBtn($('tc-left'), 'ArrowLeft');
+bindTouchBtn($('tc-right'), 'ArrowRight');
+bindTouchBtn($('tc-jump'), 'ArrowUp');
+
+// ═══ CHAT DRAWER (mobile) ═══
+const chatCol = $('chat-col');
+const chatToggle = $('chat-toggle');
+const chatClose = $('chat-close');
+function openChat(){
+  chatCol.classList.add('open');
+  chatToggle.classList.remove('has-new');
+}
+function closeChat(){
+  chatCol.classList.remove('open');
+  if (document.activeElement === chatInput) chatInput.blur();
+}
+if (chatToggle) chatToggle.addEventListener('click', () => {
+  sounds.click();
+  if (chatCol.classList.contains('open')) closeChat(); else openChat();
+});
+if (chatClose) chatClose.addEventListener('click', () => { sounds.click(); closeChat(); });
+// Notify badge when new Mario message arrives while drawer closed
+const _observer = new MutationObserver(() => {
+  if (!chatCol.classList.contains('open') && window.matchMedia('(max-width:768px)').matches) {
+    chatToggle.classList.add('has-new');
+  }
+});
+_observer.observe($('chat-msgs'), { childList: true });
+// Block touch scrolling on the canvas itself (touch-action:none already set, belt-and-suspenders)
+canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
 // ═══ TEST HOOKS ═══
 window.render_game_to_text = () => JSON.stringify({
   mode: running ? 'playing' : 'stopped',
