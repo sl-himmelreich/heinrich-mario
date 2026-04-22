@@ -507,6 +507,9 @@ function draw() {
     drawCloud(cx, cy, 50 + (i % 3) * 15);
   }
 
+  // ─── CLOUD-TEXT banner "ПРЕМЬЕРСКИЙ ЛИЦЕЙ" drifting across the sky ───
+  drawCloudTextBanner(W, cameraX);
+
   // ─── HILLS (parallax) ───
   ctx.fillStyle = '#43B047';
   for (let i = 0; i < 6; i++) {
@@ -685,6 +688,110 @@ function drawCloud(x, y, w) {
   ctx.beginPath();
   ctx.ellipse(x + w*0.7, y + h*0.25, w*0.2, h*0.3, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+// ─── Cloud-style text banner ───
+// A long "ПРЕМЬЕРСКИЙ ЛИЦЕЙ" phrase drifts across the sky.
+// Technique: render the text to an offscreen canvas once, then composite
+// a "puffy" cloud look by dilating the glyphs with soft white blobs.
+let _cloudBannerCanvas = null;
+let _cloudBannerW = 0;
+let _cloudBannerH = 0;
+function buildCloudBanner() {
+  const text = 'ПРЕМЬЕРСКИЙ   ЛИЦЕЙ';
+  const fontSize = 56;
+  const off = document.createElement('canvas');
+  const octx = off.getContext('2d');
+  octx.font = `900 ${fontSize}px "Arial Black", Impact, sans-serif`;
+  const metrics = octx.measureText(text);
+  const padX = 60, padY = 40;
+  const w = Math.ceil(metrics.width) + padX * 2;
+  const h = fontSize + padY * 2;
+  off.width = w; off.height = h;
+  // Re-apply font after resize (resetting canvas size clears state)
+  octx.font = `900 ${fontSize}px "Arial Black", Impact, sans-serif`;
+  octx.textBaseline = 'middle';
+  octx.textAlign = 'left';
+
+  // —— 1) PUFFY CLOUD SHAPE under the text ——
+  // Compose the cloud from many overlapping white circles positioned along the
+  // length of the text. The cloud is BEHIND the text, acting as a backdrop.
+  octx.save();
+  octx.fillStyle = '#ffffff';
+  const cloudCx = padX + metrics.width / 2;
+  const cloudCy = h / 2;
+  const cloudLen = metrics.width + 40;
+  // Main pillow body — elongated blob
+  octx.beginPath();
+  octx.ellipse(cloudCx, cloudCy, cloudLen / 2, h * 0.4, 0, 0, Math.PI * 2);
+  octx.fill();
+  // Bumps on top + bottom for cloud silhouette
+  const bumpCount = Math.round(cloudLen / 38);
+  for (let i = 0; i < bumpCount; i++) {
+    const x = padX - 10 + (i / (bumpCount - 1)) * (cloudLen + 20);
+    // Top bumps — varying sizes
+    const rTop = 22 + Math.sin(i * 1.7) * 8 + (i % 3) * 4;
+    octx.beginPath();
+    octx.arc(x, cloudCy - h * 0.28, rTop, 0, Math.PI * 2);
+    octx.fill();
+    // Bottom bumps — smaller
+    const rBot = 16 + Math.cos(i * 1.3) * 5 + (i % 2) * 3;
+    octx.beginPath();
+    octx.arc(x + 12, cloudCy + h * 0.28, rBot, 0, Math.PI * 2);
+    octx.fill();
+  }
+  // Extra puffy "heads" at the cap ends
+  octx.beginPath(); octx.arc(padX - 10, cloudCy, 28, 0, Math.PI * 2); octx.fill();
+  octx.beginPath(); octx.arc(padX + cloudLen + 10, cloudCy, 28, 0, Math.PI * 2); octx.fill();
+  // Soft bluish shadow on underside for depth
+  octx.globalCompositeOperation = 'source-atop';
+  const grad = octx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0)');
+  grad.addColorStop(1, 'rgba(160,195,235,0.45)');
+  octx.fillStyle = grad;
+  octx.fillRect(0, 0, w, h);
+  octx.restore();
+
+  // —— 2) TEXT on top of the cloud, in a readable sky-blue color ——
+  octx.save();
+  // Subtle shadow under the text so it reads against the white cloud
+  octx.shadowColor = 'rgba(30,80,160,0.35)';
+  octx.shadowBlur = 4;
+  octx.shadowOffsetY = 3;
+  // Deep-blue fill + outline — classic Mario sky style
+  octx.fillStyle = '#1E6EC7';
+  octx.fillText(text, padX, h/2);
+  octx.shadowColor = 'transparent';
+  // Crisp outline
+  octx.lineWidth = 3;
+  octx.lineJoin = 'round';
+  octx.strokeStyle = '#0B3D82';
+  octx.strokeText(text, padX, h/2);
+  octx.restore();
+
+  _cloudBannerCanvas = off;
+  _cloudBannerW = w;
+  _cloudBannerH = h;
+}
+function drawCloudTextBanner(viewW, cameraX) {
+  if (!_cloudBannerCanvas) buildCloudBanner();
+  const bw = _cloudBannerW, bh = _cloudBannerH;
+  // Independent drift so it moves even when camera/Mario is still.
+  // Slow drift: ~25 px/sec at 60fps → ~0.42 px/frame. Parallax with camera at 0.1.
+  const speed = 0.45;
+  const total = bw + viewW + 200; // distance until loop
+  // frame is a global ↑ time counter; combine with camera parallax
+  const t = (frame * speed + cameraX * 0.1) % total;
+  const x = viewW - t; // starts off the right edge, scrolls left
+  const y = 18; // near top of sky
+  // Subtle vertical bob
+  const bob = Math.sin(frame * 0.02) * 3;
+  ctx.globalAlpha = 0.92;
+  ctx.drawImage(_cloudBannerCanvas, Math.round(x), Math.round(y + bob));
+  // Draw a second copy offset by -total so there's no gap when wrapping
+  ctx.drawImage(_cloudBannerCanvas, Math.round(x + total), Math.round(y + bob));
   ctx.globalAlpha = 1;
 }
 
