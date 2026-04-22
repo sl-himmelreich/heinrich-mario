@@ -170,11 +170,11 @@ function generateWorld() {
 
     // Enemies (Goombas)
     if (col % 22 === 12 && col > 10) {
-      enemies.push({ x: wx, y: (groundY - 1) * TILE - 4, vx: -1, alive: true, type: 'goomba' });
+      enemies.push({ x: wx, y: (groundY - 1) * TILE - 4, vx: -1, vy: 0, alive: true, type: 'goomba', animT: Math.random()*10, huntT: 0, homeX: wx, onGround:true });
     }
     // Koopas
     if (col % 35 === 20 && col > 15) {
-      enemies.push({ x: wx, y: (groundY - 1.3) * TILE, vx: -0.8, alive: true, type: 'koopa' });
+      enemies.push({ x: wx, y: (groundY - 1.3) * TILE, vx: -0.8, vy: 0, alive: true, type: 'koopa', animT: Math.random()*10, huntT: 0, homeX: wx, onGround:true });
     }
   }
 }
@@ -363,13 +363,74 @@ function update() {
     }
   });
 
-  // ─── ENEMIES ───
+  // ─── ENEMIES (hunt AI) ───
   enemies.forEach(e => {
     if (!e.alive) return;
-    e.x += e.vx;
-    // Bounce off edges
-    const onGround = anyTileIn(e.x, e.x + 24, t => isSolid(t.type) && t.x < e.x + 24 && t.x + TILE > e.x && Math.abs(t.y - (e.y + 28)) < 8);
-    if (!onGround) e.vx = -e.vx;
+    e.animT += 1;
+
+    // Distance to Mario
+    const dx = (mario.x + mario.w/2) - (e.x + 12);
+    const adx = Math.abs(dx);
+    const ady = Math.abs((mario.y + mario.h/2) - (e.y + 12));
+    const sight = 240; // hunt radius
+
+    // AI: chase Mario when in sight, else patrol
+    let targetVx;
+    if (adx < sight && ady < 120) {
+      e.huntT = 60;
+    }
+    if (e.huntT > 0) {
+      e.huntT--;
+      const maxSpeed = e.type === 'koopa' ? 1.9 : 1.5;
+      const dir = dx > 0 ? 1 : -1;
+      targetVx = dir * maxSpeed;
+      // Koopa occasionally hops while chasing
+      if (e.type === 'koopa' && e.onGround && adx < 160 && Math.random() < 0.035) {
+        e.vy = JUMP_FORCE * 0.55;
+        e.onGround = false;
+      }
+      // Goomba little hops when very close & Mario is above
+      if (e.type === 'goomba' && e.onGround && adx < 80 && (mario.y + mario.h) < e.y - 4 && Math.random() < 0.04) {
+        e.vy = JUMP_FORCE * 0.45;
+        e.onGround = false;
+      }
+    } else {
+      // Patrol: drift back toward home, reverse on edge
+      const baseSpeed = e.type === 'koopa' ? 0.8 : 0.7;
+      targetVx = Math.sign(e.vx || -1) * baseSpeed;
+    }
+    // Smooth velocity
+    e.vx += (targetVx - e.vx) * 0.18;
+
+    // Gravity
+    e.vy = Math.min((e.vy || 0) + GRAVITY, 10);
+    // Move X with wall check
+    const nextX = e.x + e.vx;
+    const blockedX = anyTileIn(nextX, nextX + 24, t => isSolid(t.type) && t.x + TILE > nextX && t.x < nextX + 24 && t.y + TILE > e.y + 4 && t.y < e.y + 24);
+    if (blockedX) {
+      e.vx = -e.vx * 0.6;
+    } else {
+      e.x = nextX;
+    }
+    // Move Y
+    e.y += e.vy;
+    // Ground check
+    const groundHit = anyTileIn(e.x, e.x + 24, t => isSolid(t.type) && t.x + TILE > e.x && t.x < e.x + 24 && t.y >= e.y + 20 && t.y < e.y + 32);
+    if (groundHit && e.vy >= 0) {
+      // Snap to top of tile
+      const topTile = getTilesNear(e.x, e.y, 24, 32).find(t => isSolid(t.type) && t.x + TILE > e.x && t.x < e.x + 24 && t.y >= e.y + 20 && t.y < e.y + 32);
+      if (topTile) e.y = topTile.y - 28;
+      e.vy = 0;
+      e.onGround = true;
+    } else {
+      e.onGround = false;
+    }
+    // Edge detection (don't walk off ledges when patrolling)
+    if (e.huntT === 0 && e.onGround) {
+      const aheadX = e.x + (e.vx > 0 ? 26 : -2);
+      const hasFloorAhead = anyTileIn(aheadX, aheadX + 2, t => isSolid(t.type) && t.y > e.y + 24 && t.y < e.y + 40);
+      if (!hasFloorAhead) e.vx = -e.vx;
+    }
 
     // Collision with Mario
     if (Math.abs(mario.x + mario.w/2 - e.x - 12) < 22 && Math.abs(mario.y + mario.h - e.y) < 16 && mario.vy > 0) {
@@ -552,53 +613,53 @@ function draw() {
     }
   }
 
-  // ─── COINS ───
+  // ─── COINS (spinning 3D-ish) ───
   coinItems.forEach(c => {
     if (c.collected || c.x < viewL || c.x > viewR) return;
-    const cx = c.x + ox;
-    const scaleX = Math.abs(Math.sin(frame * 0.06));
-    ctx.fillStyle = '#FBD000';
+    const cx = c.x + ox + 8;
+    const cy = c.y + 8 + Math.sin(frame * 0.08 + c.x * 0.01) * 1.5;
+    const spin = Math.sin(frame * 0.12 + c.x * 0.02);
+    const sx = Math.max(Math.abs(spin), 0.15);
+    const showFace = spin > 0;
+    // Outer ring (darker gold)
+    ctx.fillStyle = '#B8860B';
     ctx.beginPath();
-    ctx.ellipse(cx + 8, c.y + 8, 6 * Math.max(scaleX, 0.2), 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, 7 * sx, 7, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#D4A800';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // Inner gold
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 5.5 * sx, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (showFace && sx > 0.5) {
+      // Face: embossed ₽-like star
+      ctx.fillStyle = '#E0A800';
+      ctx.fillRect(cx - 0.8, cy - 3, 1.6, 6);
+      ctx.fillRect(cx - 3, cy - 0.8, 6, 1.6);
+    }
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(cx - 1.5 * sx, cy - 2, 1.4 * sx, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
   });
 
   // ─── ENEMIES ───
   enemies.forEach(e => {
     if (!e.alive || e.x < viewL - 50 || e.x > viewR + 50) return;
     const ex = e.x + ox;
+    const hunting = e.huntT > 0;
+    const facing = e.vx >= 0 ? 1 : -1;
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(ex + 12, e.y + 26, 12, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     if (e.type === 'goomba') {
-      // Brown mushroom enemy
-      ctx.fillStyle = '#A0400A';
-      ctx.beginPath();
-      ctx.ellipse(ex + 12, e.y + 8, 14, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // Eyes
-      ctx.fillStyle = '#FFF';
-      ctx.fillRect(ex + 5, e.y + 4, 5, 5);
-      ctx.fillRect(ex + 14, e.y + 4, 5, 5);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(ex + 7, e.y + 5, 3, 3);
-      ctx.fillRect(ex + 16, e.y + 5, 3, 3);
-      // Feet
-      ctx.fillStyle = '#000';
-      const walkOff = Math.sin(frame * 0.1 + e.x) * 2;
-      ctx.fillRect(ex + 2, e.y + 16 + walkOff, 8, 5);
-      ctx.fillRect(ex + 14, e.y + 16 - walkOff, 8, 5);
+      drawGoomba(ex, e.y, e.animT, facing, hunting);
     } else if (e.type === 'koopa') {
-      // Green shell
-      ctx.fillStyle = '#43B047';
-      ctx.beginPath();
-      ctx.ellipse(ex + 12, e.y + 14, 12, 12, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // Head
-      ctx.fillStyle = '#FBD000';
-      ctx.fillRect(ex + 14, e.y, 8, 10);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(ex + 18, e.y + 3, 3, 3);
+      drawKoopa(ex, e.y, e.animT, facing, hunting, e.onGround);
     }
   });
 
@@ -627,69 +688,269 @@ function drawCloud(x, y, w) {
   ctx.globalAlpha = 1;
 }
 
+// Pixel-art helper: draw a grid of pixels from a string pattern using a palette.
+// pattern: array of strings, each char = palette key or '.' (transparent).
+function drawPixelSprite(px, py, pattern, palette, pixelSize, flipX) {
+  const h = pattern.length;
+  for (let r = 0; r < h; r++) {
+    const row = pattern[r];
+    const w = row.length;
+    for (let c = 0; c < w; c++) {
+      const key = row[c];
+      if (key === '.' || key === ' ') continue;
+      const color = palette[key];
+      if (!color) continue;
+      const cx = flipX ? (w - 1 - c) : c;
+      ctx.fillStyle = color;
+      ctx.fillRect(px + cx * pixelSize, py + r * pixelSize, pixelSize, pixelSize);
+    }
+  }
+}
+
 function drawMario(x, y) {
-  const M = { hat:'#E52521', skin:'#FBBF8A', overalls:'#049CD8', shoes:'#8B5E3C', button:'#FBD000' };
-  const f = mario.facing;
+  const f = mario.facing; // 1 = right, -1 = left
   const t = frame;
+  const flip = f < 0;
+  const running = mario.state === 'run' && mario.onGround;
+  const jumping = !mario.onGround;
+  const angry = mario.state === 'angry';
 
-  // Walk bob
-  let bobY = 0;
-  if (mario.state === 'run' && mario.onGround) bobY = Math.sin(t * 0.3) * 2;
-  if (mario.state === 'angry') bobY = Math.sin(t * 0.8) * 2;
-
-  const dy = y + bobY;
+  // Walk frame (4-step cycle)
+  const walkFrame = Math.floor(t * 0.2) % 4;
 
   // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,.12)';
+  ctx.fillStyle = 'rgba(0,0,0,.18)';
   ctx.beginPath();
-  ctx.ellipse(x + 14, y + mario.h, 14, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 14, y + mario.h - 1, 13, 3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ── Hat
-  ctx.fillStyle = M.hat;
-  if (f > 0) {
-    ctx.fillRect(x + 4, dy, 20, 5);
-    ctx.fillRect(x + 2, dy + 3, 26, 5);
-  } else {
-    ctx.fillRect(x + 4, dy, 20, 5);
-    ctx.fillRect(x, dy + 3, 26, 5);
+  // Palette
+  const P = {
+    R: '#E52521', // red hat/shirt
+    r: '#B01818', // red shadow
+    S: '#FBBF8A', // skin
+    s: '#D89060', // skin shadow
+    B: '#049CD8', // blue overalls
+    b: '#026A96', // blue shadow
+    Y: '#FBD000', // yellow button
+    K: '#3A1F0F', // dark brown (hair, mustache, shoes)
+    W: '#FFFFFF', // white eye
+    E: '#000000', // eye pupil
+  };
+
+  // 14x16 pixel art, pixelSize=2 → 28x32
+  // Rows (16), columns (14). Use . for transparent.
+  // Standing / running frame 0
+  const standing = [
+    '....RRRRRR....',
+    '...RRRRRRRR...',
+    '...KKKSSSSK...', // hair row under hat
+    '..KSSKSSSKSSK.', // hair + skin
+    '..KSSWEESWWEE.', // eyes
+    '..KSSSSSKKKK..', // nose/face
+    '..KKSSKKK.....', // mustache + ear
+    '....SSSSSS....',
+    '...RBYRRRRYB..', // shirt/overall top
+    '..RRBRRRRRBRR.',
+    '..SSRRRRRRSS..',
+    '..SSRRRRRRSS..',
+    '..BBBBBBBBBB..',
+    '..BBBBBBBBBB..',
+    '..KKKK..KKKK..',
+    '..KKKK..KKKK..',
+  ];
+  // Running frame (legs apart)
+  const running1 = [
+    '....RRRRRR....',
+    '...RRRRRRRR...',
+    '...KKKSSSSK...',
+    '..KSSKSSSKSSK.',
+    '..KSSWEESWWEE.',
+    '..KSSSSSKKKK..',
+    '..KKSSKKK.....',
+    '....SSSSSS....',
+    '...RBYRRRRYB..',
+    '..RRBRRRRRBRR.',
+    '..SSRRRRRRSS..',
+    '..SSRRRRRRSS..',
+    '..BBBBBBBBBB..',
+    '...BBB..BBB...',
+    '..KKKK....KKKK',
+    '.KKKK......KKK',
+  ];
+  // Running frame 2 (legs crossed / other side)
+  const running2 = [
+    '....RRRRRR....',
+    '...RRRRRRRR...',
+    '...KKKSSSSK...',
+    '..KSSKSSSKSSK.',
+    '..KSSWEESWWEE.',
+    '..KSSSSSKKKK..',
+    '..KKSSKKK.....',
+    '....SSSSSS....',
+    '...RBYRRRRYB..',
+    '..RRBRRRRRBRR.',
+    '..SSRRRRRRSS..',
+    '..SSRRRRRRSS..',
+    '..BBBBBBBBBB..',
+    '...BBBBBB.....',
+    'KKKKK...KKK...',
+    '.KKKK....KKKK.',
+  ];
+  // Jumping frame (arms up, legs bent)
+  const jumpFrame = [
+    '....RRRRRR....',
+    '...RRRRRRRR...',
+    '...KKKSSSSK...',
+    'S.KSSKSSSKSSK.',
+    'SS.KSSWEESWWE.',
+    'SSS.KSSSSSKKK.',
+    '.SSS.KKSSKKK..',
+    '..SSS.SSSSSS..',
+    '...RBYRRRRYB..',
+    '..RRBRRRRRBRR.',
+    '..RRRRRRRRRR..',
+    '..BBRRRRRRBB..',
+    '..BBBBBBBBBB..',
+    '..BBBB..BBBB..',
+    '..KKK....KKK..',
+    '..KKKK..KKKK..',
+  ];
+  let pattern;
+  if (jumping) pattern = jumpFrame;
+  else if (running) pattern = (walkFrame === 0 || walkFrame === 2) ? standing : (walkFrame === 1 ? running1 : running2);
+  else pattern = standing;
+
+  // Angry overlay: red face, eyes become slits (handled via alternate palette)
+  if (angry) {
+    P.S = '#FF9E7E';
+    P.s = '#D85A40';
   }
 
-  // ── Face
-  ctx.fillStyle = M.skin;
-  ctx.fillRect(x + 4, dy + 8, 20, 8);
-  // Eye
-  ctx.fillStyle = '#000';
-  if (mario.state === 'angry') {
-    // Angry eyebrows
-    ctx.fillRect(f > 0 ? x + 14 : x + 10, dy + 9, 5, 3);
-    ctx.fillStyle = '#E52521';
-    ctx.fillRect(f > 0 ? x + 12 : x + 8, dy + 8, 8, 2);
-  } else {
-    ctx.fillRect(f > 0 ? x + 16 : x + 8, dy + 10, 4, 3);
+  drawPixelSprite(x, y, pattern, P, 2, flip);
+}
+
+// ─── GOOMBA ───
+function drawGoomba(x, y, t, facing, hunting) {
+  const P = {
+    B: '#8B4A18', // brown body
+    b: '#5C2F0C', // dark brown
+    T: '#D4A077', // tan highlight
+    W: '#FFFFFF',
+    E: '#000000',
+    R: '#C72626', // hunting red eyes
+  };
+  // Walk cycle: 2 frames
+  const walk = Math.floor(t * 0.18) % 2;
+  // When hunting, use red eyes and angry brows
+  const eyeColor = hunting ? 'R' : 'E';
+  // 12x14 at pixelSize=2 → 24x28
+  const f1 = [
+    '...BBBBBBBB.',
+    '..BBbbbbbbB.',
+    '.BBTBBBBBBBB',
+    '.BTBBBBBBBBB',
+    'BBBBBBBBBBBB',
+    'BWWBBBBBBWWB',
+    'BWEEBBBBWEEB', // eyes
+    'BbEEBBBBbEEB',
+    'BBBBEEEEBBBB', // angry mouth/frown
+    '.BBEEEEEEBB.',
+    '..bBBBBBBb..',
+    '..bbb..bbb..',
+    '.KKK....KKK.',
+    '.KKK....KKK.',
+  ];
+  const f2 = [
+    '...BBBBBBBB.',
+    '..BBbbbbbbB.',
+    '.BBTBBBBBBBB',
+    '.BTBBBBBBBBB',
+    'BBBBBBBBBBBB',
+    'BWWBBBBBBWWB',
+    'BWEEBBBBWEEB',
+    'BbEEBBBBbEEB',
+    'BBBBEEEEBBBB',
+    '.BBEEEEEEBB.',
+    '..bBBBBBBb..',
+    '..bb....bb..',
+    'KKKK....KKKK',
+    'KKK......KKK',
+  ];
+  // Palette tweak
+  if (eyeColor === 'R') { P.E = '#C72626'; }
+  // Add K (feet) color
+  P.K = '#2A1508';
+  const pattern = walk === 0 ? f1 : f2;
+  drawPixelSprite(x, y, pattern, P, 2, facing > 0);
+
+  // Hunting indicator: little anger puff
+  if (hunting && Math.floor(t * 0.2) % 2 === 0) {
+    ctx.fillStyle = 'rgba(255,80,80,0.7)';
+    ctx.beginPath();
+    ctx.arc(x + 12, y - 3, 2, 0, Math.PI * 2);
+    ctx.fill();
   }
-  // Mustache
-  ctx.fillStyle = M.shoes;
-  ctx.fillRect(x + 8, dy + 14, 14, 2);
+}
 
-  // ── Body
-  ctx.fillStyle = M.hat;
-  ctx.fillRect(x + 4, dy + 16, 22, 4);
-  ctx.fillStyle = M.overalls;
-  ctx.fillRect(x + 4, dy + 20, 22, 8);
-  ctx.fillStyle = M.button;
-  ctx.fillRect(x + 8, dy + 22, 3, 3);
-  ctx.fillRect(x + 18, dy + 22, 3, 3);
+// ─── KOOPA ───
+function drawKoopa(x, y, t, facing, hunting, onGround) {
+  const P = {
+    G: '#3DAE2B', // shell green
+    g: '#1E6818', // shell dark
+    L: '#7FE056', // shell highlight
+    Y: '#F4D85A', // skin yellow
+    y: '#C9A020', // skin shadow
+    W: '#FFFFFF',
+    E: '#000000',
+    R: '#C72626',
+    K: '#2A1508',
+  };
+  const walk = Math.floor(t * 0.2) % 2;
+  // 12x14 pixel art
+  const stand = [
+    '....GGGGGGG.',
+    '...GLLLGGGGG',
+    '..GLLLGgGGGg',
+    '.GLGGGggggGg',
+    'GGYYYgggggg.',
+    'GYWWYgggggg.',
+    'GYWEYggggGg.',
+    'GYWYYggggGg.',
+    'gYYYgggggGg.',
+    'ggYYgggggGg.',
+    'ggYgggggggg.',
+    'ggggggggggg.',
+    '.YYY....YYY.',
+    '.yyy....yyy.',
+  ];
+  const walkFrame = [
+    '....GGGGGGG.',
+    '...GLLLGGGGG',
+    '..GLLLGgGGGg',
+    '.GLGGGggggGg',
+    'GGYYYgggggg.',
+    'GYWWYgggggg.',
+    'GYWEYggggGg.',
+    'GYWYYggggGg.',
+    'gYYYgggggGg.',
+    'ggYYgggggGg.',
+    'ggYgggggggg.',
+    'ggggggggggg.',
+    '..YYY..YYY..',
+    'yy......yyy.',
+  ];
+  if (hunting) { P.E = '#C72626'; }
+  const pattern = (!onGround) ? stand : (walk === 0 ? stand : walkFrame);
+  drawPixelSprite(x, y, pattern, P, 2, facing > 0);
 
-  // ── Legs
-  const legOff = mario.state === 'run' ? Math.sin(t * 0.3) * 3 : 0;
-  ctx.fillStyle = M.overalls;
-  ctx.fillRect(x + 4, dy + 28, 8, 4);
-  ctx.fillRect(x + 16, dy + 28 + legOff, 8, 4);
-  // Shoes
-  ctx.fillStyle = M.shoes;
-  ctx.fillRect(x + 2, dy + 31, 12, 5);
-  ctx.fillRect(x + 14, dy + 31 + legOff, 12, 5);
+  // Angry aura when hunting
+  if (hunting && Math.floor(t * 0.15) % 2 === 0) {
+    ctx.fillStyle = 'rgba(255,80,80,0.65)';
+    ctx.beginPath();
+    ctx.arc(x - 2 + (facing>0?26:-2), y + 4, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawSpeechBubble(x, y, text) {
