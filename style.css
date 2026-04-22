@@ -176,7 +176,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 }
 
 /* Phone — chat becomes slide-in drawer, game takes full height */
-@media(max-width:768px){
+@media(max-width:900px) and (orientation:portrait), (max-width:768px){
   .topbar{padding:6px 10px}
   .topbar-title{display:none}
   .topbar-coins,.topbar-score{font-size:7px;padding:3px 7px}

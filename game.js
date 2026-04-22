@@ -96,10 +96,21 @@ function onPlayerInput() {
 
 // ═══ WORLD GENERATION ═══
 let worldTiles = []; // { x, y, type }
+let tilesByCol = []; // tilesByCol[col] = [tiles] — for fast viewport culling
 let enemies = [];
 let coinItems = [];
 let worldLength = 0;
 let groundCols = new Set(); // columns that have ground (for underground fill)
+
+function indexTiles() {
+  tilesByCol = [];
+  for (let i = 0; i < worldTiles.length; i++) {
+    const t = worldTiles[i];
+    const c = Math.floor(t.x / TILE);
+    if (!tilesByCol[c]) tilesByCol[c] = [];
+    tilesByCol[c].push(t);
+  }
+}
 
 function generateWorld() {
   worldTiles = [];
@@ -170,14 +181,36 @@ function generateWorld() {
 
 // ═══ COLLISION ═══
 function getTilesNear(x, y, w, h) {
-  return worldTiles.filter(t =>
-    t.x < x + w && t.x + TILE > x &&
-    t.y < y + h && t.y + TILE > y
-  );
+  const c0 = Math.floor(x / TILE) - 1;
+  const c1 = Math.floor((x + w) / TILE) + 1;
+  const out = [];
+  for (let c = c0; c <= c1; c++) {
+    const bucket = tilesByCol[c];
+    if (!bucket) continue;
+    for (let k = 0; k < bucket.length; k++) {
+      const t = bucket[k];
+      if (t.x < x + w && t.x + TILE > x && t.y < y + h && t.y + TILE > y) out.push(t);
+    }
+  }
+  return out;
+}
+
+// Fast "any tile matching predicate within column range" check
+function anyTileIn(xLeft, xRight, predicate) {
+  const c0 = Math.floor(xLeft / TILE) - 1;
+  const c1 = Math.floor(xRight / TILE) + 1;
+  for (let c = c0; c <= c1; c++) {
+    const bucket = tilesByCol[c];
+    if (!bucket) continue;
+    for (let k = 0; k < bucket.length; k++) {
+      if (predicate(bucket[k])) return true;
+    }
+  }
+  return false;
 }
 
 function isSolid(type) {
-  return ['ground','pipe-top','pipe-body','brick','qblock'].includes(type);
+  return type === 'ground' || type === 'pipe-top' || type === 'pipe-body' || type === 'brick' || type === 'qblock';
 }
 
 // ═══ UPDATE ═══
@@ -228,12 +261,12 @@ function update() {
       let groundAhead = false;
       for (let check = 0; check < 3; check++) {
         const cx = aheadX + check * TILE;
-        if (worldTiles.some(t =>
+        if (anyTileIn(cx, cx + TILE, t =>
           isSolid(t.type) && t.x < cx + TILE && t.x + TILE > cx &&
           t.y >= feetY - 4 && t.y < feetY + TILE * 2
         )) { groundAhead = true; break; }
       }
-      const wallAhead = worldTiles.some(t =>
+      const wallAhead = anyTileIn(aheadX, aheadX + 12, t =>
         isSolid(t.type) && t.x < aheadX + 12 && t.x + TILE > aheadX &&
         t.y < feetY - 4 && t.y + TILE > mario.y
       );
@@ -335,7 +368,7 @@ function update() {
     if (!e.alive) return;
     e.x += e.vx;
     // Bounce off edges
-    const onGround = worldTiles.some(t => isSolid(t.type) && t.x < e.x + 24 && t.x + TILE > e.x && Math.abs(t.y - (e.y + 28)) < 8);
+    const onGround = anyTileIn(e.x, e.x + 24, t => isSolid(t.type) && t.x < e.x + 24 && t.x + TILE > e.x && Math.abs(t.y - (e.y + 28)) < 8);
     if (!onGround) e.vx = -e.vx;
 
     // Collision with Mario
@@ -445,14 +478,19 @@ function draw() {
     }
   }
 
-  // ─── TILES ───
+  // ─── TILES (viewport-culled via column index) ───
   const viewL = cameraX - TILE;
   const viewR = cameraX + W + TILE;
-  worldTiles.forEach(t => {
-    if (t.x < viewL || t.x > viewR) return;
-    const dx = t.x + ox;
-    const dy = t.y;
-    switch (t.type) {
+  const colStart = Math.max(0, Math.floor(viewL / TILE));
+  const colEnd = Math.ceil(viewR / TILE);
+  for (let c = colStart; c <= colEnd; c++) {
+    const bucket = tilesByCol[c];
+    if (!bucket) continue;
+    for (let k = 0; k < bucket.length; k++) {
+      const t = bucket[k];
+      const dx = t.x + ox;
+      const dy = t.y;
+      switch (t.type) {
       case 'ground':
         ctx.fillStyle = '#C84C0C';
         ctx.fillRect(dx, dy, TILE, TILE);
@@ -510,8 +548,9 @@ function draw() {
         ctx.fillStyle = 'rgba(255,255,255,.12)';
         ctx.fillRect(dx + 3, dy, 4, TILE);
         break;
+      }
     }
-  });
+  }
 
   // ─── COINS ───
   coinItems.forEach(c => {
@@ -970,6 +1009,7 @@ function resize() {
 
 function startGame() {
   generateWorld();
+  indexTiles();
   mario.x = 100;
   mario.y = 12 * TILE;
   mario.vy = 0;
@@ -1189,7 +1229,7 @@ if (chatToggle) chatToggle.addEventListener('click', () => {
 if (chatClose) chatClose.addEventListener('click', () => { sounds.click(); closeChat(); });
 // Notify badge when new Mario message arrives while drawer closed
 const _observer = new MutationObserver(() => {
-  if (!chatCol.classList.contains('open') && window.matchMedia('(max-width:768px)').matches) {
+  if (!chatCol.classList.contains('open') && window.matchMedia('(max-width:900px) and (orientation:portrait), (max-width:768px)').matches) {
     chatToggle.classList.add('has-new');
   }
 });
