@@ -1,13 +1,15 @@
 """Weekly backup of this branch for handover to another agent.
 
-Builds <branch>_<YYYY-MM-DD>.zip (Moscow date) with:
+Builds "<session name>_<YYYY-MM-DD>.zip" (Moscow date). The session name is the
+conversation title shown in the Claude app (e.g. "ГЕНРИХ презентации"), passed as the
+first argument — never the git branch name. The archive holds:
   - every text file of the project folder (README, scripts);
   - MANIFEST.txt: every file in the branch with size, SHA-256 and a GitHub link at the current commit;
   - BRANCH_INFO.txt: branch, commit, date, recent history.
 Large binaries (PPTX, PDF, images) are listed in the manifest, not packed: the Google Drive
 connector only accepts file content inline, which limits uploads to small files.
 
-Usage: python3 presentations/backup.py [output_dir]
+Usage: python3 presentations/backup.py "<session name>" [output_dir]
 Prints the Drive title, the local path, and the path of a .b64 file with the base64 content.
 """
 import base64
@@ -35,10 +37,13 @@ os.chdir(root)
 branch = git('branch', '--show-current')
 commit = git('rev-parse', 'HEAD')
 today = datetime.datetime.now(ZoneInfo('Europe/Moscow')).date().isoformat()
-title = f'{branch}_{today}.zip'
-out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(tempfile.gettempdir(), 'branch_backups')
+if len(sys.argv) < 2 or not sys.argv[1].strip():
+    sys.exit('usage: backup.py "<session name from the Claude app>" [output_dir]')
+session_name = sys.argv[1].strip()
+title = f'{session_name}_{today}.zip'
+out_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join(tempfile.gettempdir(), 'session_backups')
 os.makedirs(out_dir, exist_ok=True)
-local_zip = os.path.join(out_dir, title.replace('/', '__'))
+local_zip = os.path.join(out_dir, title.replace('/', '_'))
 
 files = sorted(set(git('ls-files').splitlines() + git('ls-files', '--others', '--exclude-standard').splitlines()))
 manifest = ['# path\tbytes\tsha256\tlink (at backup commit)']
@@ -53,7 +58,7 @@ for f in files:
 
 status = git('status', '--short') or '(clean)'
 info = '\n'.join([
-    f'branch: {branch}', f'commit: {commit}', f'backup date (Moscow): {today}', f'repository: {REPO_URL}',
+    f'session: {session_name}', f'git branch: {branch}', f'commit: {commit}', f'backup date (Moscow): {today}', f'repository: {REPO_URL}',
     '', 'uncommitted changes:', status, '', 'recent history:', git('log', '--oneline', '-30'),
 ])
 
